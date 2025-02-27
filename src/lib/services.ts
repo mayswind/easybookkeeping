@@ -145,7 +145,25 @@ const blockedRequests: ((token: string | undefined) => void)[] = [];
 
 axios.defaults.baseURL = BASE_API_URL_PATH;
 axios.defaults.timeout = DEFAULT_API_TIMEOUT;
+
+// Add a request interceptor to implement rate limiting
+let requestCount = 0;
+let startTime = Date.now();
+
 axios.interceptors.request.use((config: ApiRequestConfig) => {
+    const currentTime = Date.now();
+    if (currentTime - startTime > rateLimitConfig.windowMs) {
+        // Reset the counter and start time after the window period
+        requestCount = 0;
+        startTime = currentTime;
+    }
+
+    if (requestCount >= rateLimitConfig.max) {
+        return Promise.reject(new Error(rateLimitConfig.message));
+    }
+
+    requestCount++;
+    
     const token = getCurrentToken();
 
     if (token && !config.noAuth) {
